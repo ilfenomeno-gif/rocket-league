@@ -96,16 +96,34 @@ bool GameCarsComponent::spawnProductData(FOnlineProductData productData, const s
 	saveData->EventNewOnlineProduct(saveData, onlineProd, msg);
 	if (saveData->OnlineProductSet) {
 		saveData->OnlineProductSet->Add(onlineProd);
-
-		/*
-		    auto ProductData = online_product->InstanceOnlineProductData();
-		    Events.spawnedProducts.push_back(ProductData);
-		*/
 	}
 
 	LOG("Successfully spawned product: {}", onlineProd->ToJson().ToString());
 	return true;
 }
+
+// ─── NUOVO: Riscatta tutte le 216 RL Cars ────────────────────────────────────
+void GameCarsComponent::spawnAllCars() {
+	int spawned = 0;
+	int failed  = 0;
+
+	for (const auto &[productID, productInfo] : ProductData::s_bodyProducts) {
+		UOnlineProduct_TA *result = spawnProduct(productID);
+		if (result)
+			spawned++;
+		else
+			failed++;
+	}
+
+	std::string msg = std::format("Riscattate {} auto su {}. ({} fallite)",
+	    spawned,
+	    ProductData::s_bodyProducts.size(),
+	    failed);
+
+	LOG("{}", msg);
+	Instances.spawnNotification("Custom Car", msg, 5, true);
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 FProductInstanceID GameCarsComponent::generatePIID(int64_t prod) {
 	static int s_generatedPIIDs = 0;
@@ -127,7 +145,6 @@ void GameCarsComponent::applyLoadoutToPRI(APRI_TA *pri) {
 	if (!validUObject(pri))
 		return;
 
-	// get instances of stuff we need
 	ULocalPlayer *lp = Instances.IULocalPlayer();
 	if (!lp || !validUObject(lp->Actor) || !lp->Actor->IsA<APlayerControllerBase_TA>())
 		return;
@@ -146,19 +163,16 @@ void GameCarsComponent::applyLoadoutToPRI(APRI_TA *pri) {
 	if (!validUObject(loadoutSet))
 		return;
 
-	// apply to blue (0) and orange (1) loadouts
 	for (int i = 0; i < 2; ++i) {
 		ULoadout_TA *loadout = loadoutSet->Loadouts[i];
 		if (!validUObject(loadout))
 			continue;
 
 		for (int j = 0; j < loadout->OnlineProducts128.size(); ++j) {
-			// set products
 			FProductInstanceID &onlineId                = loadout->OnlineProducts128[j];
 			int32_t             prodId                  = saveData->GetProductIDFromOnlineID(onlineId);
 			pri->ClientLoadouts.Loadouts[i].Products[j] = prodId;
 
-			// set product attributes
 			UOnlineProduct_TA *onlineProduct = saveData->GetOnlineProduct(onlineId);
 			if (!onlineProduct)
 				continue;
@@ -196,7 +210,7 @@ void GameCarsComponent::display_settings() {
 			carNames.push_back(val.name);
 		}
 
-		std::sort(carNames.begin(), carNames.end()); // sort alphabetically
+		std::sort(carNames.begin(), carNames.end());
 		carGuiDataInitialized = true;
 	}
 
@@ -222,7 +236,6 @@ void GameCarsComponent::display_settings() {
 		ImGui::Text("%zu cars found", ProductData::s_bodyProducts.size());
 
 		GUI::verticalSpacing_relative(30.0f);
-		// GUI::Spacing(8);
 
 		bool useSpawnedCars = useSpawnedCars_cvar.getBoolValue();
 		if (ImGui::Checkbox("Use spawned cars in game", &useSpawnedCars)) {
@@ -237,6 +250,7 @@ void GameCarsComponent::display_settings() {
 	{
 		GUI::ScopedChild c{"Buttons"};
 
+		// ── Riga 1: Spawn singola auto + Resync ──────────────────────────────
 		{
 			GUI::ScopedChild c{"SpawnButton", ImVec2(ImGui::GetContentRegionAvailWidth() * 0.75f, 0)};
 
@@ -268,6 +282,21 @@ void GameCarsComponent::display_settings() {
 
 			ImGui::PopStyleColor(3);
 		}
+
+		// ── NUOVO: Bottone Riscatta tutte le auto ────────────────────────────
+		GUI::Spacing(4);
+
+		ImGui::PushStyleColor(ImGuiCol_Button,        (ImVec4)ImColor::HSV(0.38f, 0.7f, 0.6f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, (ImVec4)ImColor::HSV(0.38f, 0.8f, 0.75f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive,  (ImVec4)ImColor::HSV(0.38f, 0.9f, 0.5f));
+
+		if (ImGui::Button("Riscatta tutte le auto", ImVec2(ImGui::GetContentRegionAvailWidth(), 40))) {
+			GAME_THREAD_EXECUTE({ spawnAllCars(); });
+		}
+		GUI::ToolTip(std::format("Riscatta tutte le {} RL Cars in un click!", ProductData::s_bodyProducts.size()).c_str());
+
+		ImGui::PopStyleColor(3);
+		// ─────────────────────────────────────────────────────────────────────
 	}
 }
 
