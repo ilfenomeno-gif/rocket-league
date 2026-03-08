@@ -6,7 +6,6 @@ class GameCarsComponent : Component<GameCarsComponent> {
 public:
 	GameCarsComponent()  = default;
 	~GameCarsComponent() = default;
-
 	static constexpr std::string_view componentName = "GameCars";
 	void                              init(const std::shared_ptr<GameWrapper> &gw);
 
@@ -34,6 +33,9 @@ public:
 	    const std::string              &spawnMessage = "");
 
 	bool spawnProductData(FOnlineProductData productData, const std::string &spawnMessage);
+
+	// ── NUOVO: riscatta tutte le auto dal catalogo RL ──
+	void spawnAllCars();
 
 private:
 	void applyLoadoutToPRI(APRI_TA *pri);
